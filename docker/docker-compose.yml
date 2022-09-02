@@ -1,0 +1,130 @@
+version: '3.4'
+services:
+  nginx:
+    image: nginx:1.21.3-alpine
+    volumes:
+      - ./build/nginx/developer.conf:/etc/nginx/conf.d/default.conf:ro
+      - code_sync:/var/www/magento2:ro
+      - ../app/code:/var/www/magento2/app/code:ro
+      - ../app/design:/var/www/magento2/app/design:ro
+    depends_on:
+      - php
+    env_file:
+      - env/nginx
+  tls:
+    image: nginx:1.21.3-alpine
+    volumes:
+      - type: bind
+        source: ./build/tls/cert
+        target: /etc/nginx/ssl
+      - type: bind
+        source: ./build/tls/etc/vhost.conf
+        target: /etc/nginx/conf.d/default.conf
+    env_file:
+      - env/nginx
+    ports:
+      - '80:80'
+      - '443:443'
+    depends_on:
+      - varnish
+  php:
+    build:
+      context: .
+      dockerfile: build/php/Dockerfile
+      args:
+        BASE_CODE_FOLDER: build/php/magento2
+    volumes:
+      - code_sync:/var/www/magento2:rw
+      - ../app/code:/var/www/magento2/app/code:rw
+      - ../app/etc/config.php:/var/www/magento2/app/etc/config.php:rw
+      - ../app/design:/var/www/magento2/app/design:rw
+    entrypoint: /docker-entrypoint.sh
+    command: sudo bash -c "/usr/sbin/sshd && /usr/local/sbin/php-fpm"
+    ports:
+      - "2222:22"
+    depends_on:
+      - mysql
+      - redis
+      - rabbitmq
+      - elasticsearch
+    env_file:
+      - env/php
+      - env/nginx
+      - env/mysql
+      - env/redis
+      - env/magento
+  xdebug:
+    build:
+      context: .
+      dockerfile: build/php/Dockerfile
+      args:
+        WITH_XDEBUG: 1
+    volumes:
+      - code_sync:/var/www/magento2:rw
+      - ../app/code:/var/www/magento2/app/code:rw
+      - ../app/etc/config.php:/var/www/magento2/app/etc/config.php:rw
+      - ../app/design:/var/www/magento2/app/design:rw
+    command: sudo bash -c "/usr/sbin/sshd && /usr/local/sbin/php-fpm"
+    depends_on:
+      - mysql
+      - redis
+      - rabbitmq
+      - elasticsearch
+    env_file:
+      - env/php
+      - env/nginx
+      - env/mysql
+      - env/redis
+      - env/magento
+  varnish:
+    image: varnish:6.0.8
+    volumes:
+      - type: bind
+        source: ./build/varnish/varnish.vcl
+        target: /etc/varnish/default.vcl
+    depends_on:
+      - php
+      - nginx
+  mysql:
+    image: mysql:8.0
+    volumes:
+      - db-data:/var/lib/mysql:rw
+    ports:
+      - "3306:3306"
+    env_file:
+      - env/mysql
+  redis:
+    image: redis:latest
+    env_file:
+      - env/redis
+  rabbitmq:
+    image: rabbitmq:3.7.8-management
+    ports:
+      - "15672:15672"
+    env_file:
+      - env/rabbitmq
+  adminer:
+    image: adminer:latest
+    env_file:
+      - env/adminer
+    ports:
+      - "8080:8080"
+    links:
+      - mysql
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.6.2
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch:/usr/share/elasticsearch/data:rw
+volumes:
+  db-data: {}
+  code_sync: {}
+  elasticsearch: {}

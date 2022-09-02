@@ -1,0 +1,4 @@
+PHP_MEMORY_LIMIT=2048mb
+CLIENT_SECRET=/run/secrets/client_secret
+SERVER_SECRET=/run/secrets/server_secret
+AES_KEY=/run/secrets/aes_key

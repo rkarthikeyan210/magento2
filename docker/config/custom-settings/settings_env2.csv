@@ -1,0 +1,3 @@
+web/unsecure/base_url;http://ecsd00300856.epam.com:82/
+payment/secure_pay/payment_config;VanillaEPAM82
+web/secure/base_url;https://ecsd00300856.epam.com:82/
